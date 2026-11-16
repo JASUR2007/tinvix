@@ -11,9 +11,9 @@ interface CartSuccessProps {
 export function CartSuccess({ orderId, onClose }: CartSuccessProps) {
   return (
     <div className="py-12 flex flex-col items-center justify-center text-center">
-      <CheckCircle2 className="w-16 h-16 text-green-500 mb-3 animate-bounce" />
+      <CheckCircle2 className="w-16 h-16 text-emerald-500 mb-3 animate-bounce" />
       <h3 className="text-xl font-bold text-slate-900">
-        Заказ {orderId ? `#${orderId}` : ""} принят!
+        Заказ {orderId ? `№${orderId}` : ""} принят!
       </h3>
       <p className="text-sm text-slate-500 mt-1 max-w-sm">
         Заказ успешно сохранён в базе данных PostgreSQL. Демонстрационный режим без реальной оплаты.
