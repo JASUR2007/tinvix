@@ -8,7 +8,7 @@ from fastapi.staticfiles import StaticFiles
 from app.core.config import settings
 from app.database import init_db
 from app.services.storage import storage_service
-from app.routers import products_router, orders_router, health_router
+from app.routers import products_router, orders_router, health_router, seed_router
 
 logging.basicConfig(
     level=logging.INFO,
@@ -59,6 +59,7 @@ app.mount("/storage/products", StaticFiles(directory=upload_dir), name="storage_
 app.include_router(products_router, prefix="/api")
 app.include_router(orders_router, prefix="/api")
 app.include_router(health_router, prefix="/api")
+app.include_router(seed_router, prefix="/api")
 app.include_router(health_router, prefix="")
 
 
