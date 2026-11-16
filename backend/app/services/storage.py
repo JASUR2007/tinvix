@@ -1,10 +1,8 @@
 import io
 import json
 import logging
-import os
 import uuid
 from minio import Minio
-from minio.error import S3Error
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -15,15 +13,14 @@ class StorageService:
         endpoint = settings.MINIO_ENDPOINT.strip()
         secure = settings.MINIO_SECURE
 
-        # Automatically handle full URLs (e.g. from Cloudflare R2)
         if endpoint.startswith("https://"):
             endpoint = endpoint.replace("https://", "")
             secure = True
         elif endpoint.startswith("http://"):
             endpoint = endpoint.replace("http://", "")
-
         endpoint = endpoint.rstrip("/")
 
+        self.storage_type = "r2" if "r2.cloudflarestorage" in endpoint else "minio"
         try:
             self.client = Minio(
                 endpoint=endpoint,
@@ -32,20 +29,19 @@ class StorageService:
                 secure=secure,
             )
         except Exception as e:
-            logger.warning("S3/MinIO client init warning: %s", e)
+            logger.error("Failed to init S3/MinIO client: %s", e)
             self.client = None
 
         self.bucket = settings.MINIO_BUCKET.strip()
 
     def ensure_bucket(self) -> None:
         if not self.client:
-            return
+            raise RuntimeError("S3/MinIO client not initialized")
         try:
             if not self.client.bucket_exists(self.bucket):
                 self.client.make_bucket(self.bucket)
                 logger.info("Bucket %s created.", self.bucket)
 
-            # Public read policy (works on MinIO, ignored gracefully on R2/AWS)
             policy = {
                 "Version": "2012-10-17",
                 "Statement": [
@@ -60,53 +56,52 @@ class StorageService:
             }
             self.client.set_bucket_policy(self.bucket, json.dumps(policy))
         except Exception as e:
-            logger.info("Note on bucket check: %s (normal for Cloudflare R2)", e)
+            logger.info("Bucket ensure note: %s", e)
 
-    def upload_file(
-        self,
-        file_bytes: bytes,
-        filename: str,
-        content_type: str = "image/jpeg",
-    ) -> str:
+    def upload_file(self, file_bytes: bytes, filename: str, content_type: str = "image/jpeg") -> str:
+        if not self.client:
+            raise RuntimeError("S3/MinIO хранилище не инициализировано: проверьте настройки S3/MinIO")
+
         ext = filename.split(".")[-1] if "." in filename else "jpg"
         object_name = f"{uuid.uuid4().hex}.{ext}"
-        image_url = ""
 
-        # Try S3 / MinIO / R2
         try:
-            if self.client:
-                self.ensure_bucket()
-                self.client.put_object(
-                    bucket_name=self.bucket,
-                    object_name=object_name,
-                    data=io.BytesIO(file_bytes),
-                    length=len(file_bytes),
-                    content_type=content_type,
-                )
-                base_url = settings.MINIO_PUBLIC_URL.rstrip("/")
-                # If public URL is an R2 dev domain like https://pub-xxx.r2.dev
-                if "r2.dev" in base_url or base_url.endswith(f"/{self.bucket}"):
-                    image_url = f"{base_url}/{object_name}"
-                else:
-                    image_url = f"{base_url}/{self.bucket}/{object_name}"
-                logger.info("Uploaded to S3/R2 successfully: %s", image_url)
+            self.ensure_bucket()
+            self.client.put_object(
+                bucket_name=self.bucket,
+                object_name=object_name,
+                data=io.BytesIO(file_bytes),
+                length=len(file_bytes),
+                content_type=content_type,
+            )
         except Exception as e:
-            logger.warning("S3/R2 put_object failed (%s), saving to local static storage...", e)
+            logger.error("S3/MinIO put_object failed: %s", e)
+            raise RuntimeError(f"Ошибка сохранения файла в S3/MinIO: {str(e)}")
 
-        # Fallback to local static storage if S3/R2 is not configured
-        if not image_url:
-            base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-            upload_dir = os.path.join(base_dir, "static", "uploads")
-            os.makedirs(upload_dir, exist_ok=True)
-            with open(os.path.join(upload_dir, object_name), "wb") as f:
-                f.write(file_bytes)
-            image_url = f"/storage/products/{object_name}"
+        base_url = settings.MINIO_PUBLIC_URL.rstrip("/")
+        if "r2.dev" in base_url or base_url.endswith(f"/{self.bucket}"):
+            return f"{base_url}/{object_name}"
+        return f"{base_url}/{self.bucket}/{object_name}"
 
-        # If PUBLIC_BASE_URL is set, prepend it to relative URLs
-        if settings.PUBLIC_BASE_URL and image_url.startswith("/"):
-            image_url = f"{settings.PUBLIC_BASE_URL.rstrip('/')}{image_url}"
+    def check_health(self) -> tuple[bool, str]:
+        if not self.client:
+            return False, "client not configured"
+        try:
+            exists = self.client.bucket_exists(self.bucket)
+            if not exists:
+                return False, f"bucket '{self.bucket}' does not exist"
 
-        return image_url
+            # Probe write & read to verify real storage I/O
+            probe_key = ".health_probe"
+            probe_data = b"ok"
+            self.client.put_object(self.bucket, probe_key, io.BytesIO(probe_data), len(probe_data))
+            obj = self.client.get_object(self.bucket, probe_key)
+            obj.read()
+            obj.close()
+            obj.release_conn()
+            return True, f"ok ({self.storage_type})"
+        except Exception as e:
+            return False, f"error ({self.storage_type}): {str(e)}"
 
 
 storage_service = StorageService()

@@ -78,14 +78,16 @@ services:
       dockerfile: Dockerfile
     image: tinvix-bot:latest
     restart: always
+    deploy:
+      replicas: 2
     environment:
       BOT_TOKEN: ${BOT_TOKEN:-}
       ADMIN_API_KEY: ${ADMIN_API_KEY:-tinvix_secret_admin_key_2026}
       BACKEND_URL: http://nginx:80
       MINI_APP_URL: ${MINI_APP_URL:-http://localhost}
       ADMIN_IDS: ${ADMIN_IDS:-}
-      BOT_MODE: ${BOT_MODE:-polling}
-      WEBHOOK_HOST: ${WEBHOOK_HOST:-}
+      BOT_MODE: ${BOT_MODE:-webhook}
+      WEBHOOK_HOST: ${WEBHOOK_HOST:-http://nginx:80}
       WEBHOOK_SECRET: ${WEBHOOK_SECRET:-my-webhook-secret-token}
     depends_on:
       - nginx

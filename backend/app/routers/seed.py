@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.database import get_db
 from app.models.product import Product
+from app.routers.products import verify_admin
 
 router = APIRouter(prefix="/seed", tags=["Seed"])
 
@@ -33,9 +34,12 @@ DEMO_ITEMS = [
     },
 ]
 
+
 @router.post("")
-@router.get("")
-async def seed_demo_products(db: AsyncSession = Depends(get_db)):
+async def seed_demo_products(
+    db: AsyncSession = Depends(get_db),
+    _: None = Depends(verify_admin),
+):
     result = await db.execute(select(Product))
     existing = result.scalars().all()
     if existing:

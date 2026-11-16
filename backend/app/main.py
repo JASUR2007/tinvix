@@ -1,9 +1,7 @@
 import logging
-import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 
 from app.core.config import settings
 from app.database import init_db
@@ -50,11 +48,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# Mount local static storage fallback for images
-upload_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static", "uploads")
-os.makedirs(upload_dir, exist_ok=True)
-app.mount("/storage/products", StaticFiles(directory=upload_dir), name="storage_products")
 
 app.include_router(products_router, prefix="/api")
 app.include_router(orders_router, prefix="/api")

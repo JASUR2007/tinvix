@@ -91,7 +91,8 @@ async def handle_photo_with_caption(message: Message, bot: Bot):
         await bot.download_file(file_info.file_path, destination=buffer)
         file_bytes = buffer.getvalue()
 
-        filename = f"tg_{photo.file_unique_id}.jpg"
+        update_idempotency_key = f"{message.chat.id}_{message.message_id}"
+        filename = f"tg_{update_idempotency_key}.jpg"
 
         # Upload via backend service (which handles MinIO + PostgreSQL + idempotency)
         product = await api_client.create_product(
@@ -99,7 +100,7 @@ async def handle_photo_with_caption(message: Message, bot: Bot):
             file_bytes=file_bytes,
             filename=filename,
             content_type="image/jpeg",
-            telegram_file_id=photo.file_unique_id,
+            telegram_file_id=update_idempotency_key,
         )
 
         catalog_kb = InlineKeyboardMarkup(

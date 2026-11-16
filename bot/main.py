@@ -44,7 +44,7 @@ async def setup_menu_button(bot: Bot):
 
 async def run_polling(bot: Bot, dp: Dispatcher):
     logger.info("Starting bot [%s] in POLLING mode...", INSTANCE_ID)
-    await bot.delete_webhook(drop_pending_updates=True)
+    await bot.delete_webhook(drop_pending_updates=False)
     await setup_menu_button(bot)
 
     # Health server satisfies Render Web Service port check
@@ -73,7 +73,7 @@ def run_webhook(bot: Bot, dp: Dispatcher):
         await setup_menu_button(bot)
         if settings.WEBHOOK_HOST:
             url = f"{settings.WEBHOOK_HOST.rstrip('/')}{settings.WEBHOOK_PATH}"
-            await bot.set_webhook(url=url, secret_token=settings.WEBHOOK_SECRET, drop_pending_updates=True)
+            await bot.set_webhook(url=url, secret_token=settings.WEBHOOK_SECRET, drop_pending_updates=False)
 
     @app.post(settings.WEBHOOK_PATH)
     async def telegram_update(request: Request):
