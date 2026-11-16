@@ -29,6 +29,7 @@ wheels/
 # Next.js
 .next/
 out/
+*.tsbuildinfo
 
 # Environment files (never commit real tokens or credentials)
 .env
