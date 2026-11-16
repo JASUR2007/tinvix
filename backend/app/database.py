@@ -1,4 +1,5 @@
 from typing import AsyncGenerator
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import declarative_base
 
@@ -33,3 +34,10 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
 async def init_db() -> None:
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        # Automatic safe schema migration for existing databases
+        await conn.execute(
+            text("ALTER TABLE products ADD COLUMN IF NOT EXISTS telegram_file_id VARCHAR(255);")
+        )
+        await conn.execute(
+            text("CREATE UNIQUE INDEX IF NOT EXISTS ix_products_telegram_file_id ON products (telegram_file_id);")
+        )
