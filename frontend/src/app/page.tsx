@@ -34,7 +34,7 @@ export default function CatalogPage() {
         isLoading={isLoading}
       />
 
-      <main className="flex-1 max-w-5xl w-full mx-auto px-4 py-6">
+      <main className="flex-1 max-w-5xl w-full mx-auto px-3 sm:px-4 py-4 sm:py-6">
         {error && (
           <div className="mb-6 p-4 rounded-xl bg-red-50 border border-red-200 flex items-center justify-between text-red-700">
             <div className="flex items-center gap-3">
@@ -55,7 +55,7 @@ export default function CatalogPage() {
         ) : products.length === 0 ? (
           <EmptyCatalog />
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5 sm:gap-4">
             {products.map((product: Product) => (
               <ProductCard
                 key={product.id}

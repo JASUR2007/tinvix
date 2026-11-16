@@ -4,7 +4,7 @@ import React from "react";
 
 export function CatalogSkeleton() {
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5 sm:gap-4">
       {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
         <div
           key={n}
