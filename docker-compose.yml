@@ -81,13 +81,13 @@ services:
     deploy:
       replicas: 2
     environment:
-      BOT_TOKEN: ${BOT_TOKEN:-}
+      BOT_TOKEN: ${BOT_TOKEN:-9119830014:AAHk8_DEMO_TOKEN_FOR_TINVIX_BOT_2026}
       ADMIN_API_KEY: ${ADMIN_API_KEY:-tinvix_secret_admin_key_2026}
       BACKEND_URL: http://nginx:80
-      MINI_APP_URL: ${MINI_APP_URL:-http://localhost}
-      ADMIN_IDS: ${ADMIN_IDS:-}
+      MINI_APP_URL: ${MINI_APP_URL:-https://tinvix.onrender.com}
+      ADMIN_IDS: ${ADMIN_IDS:-9119830014,123456789}
       BOT_MODE: ${BOT_MODE:-webhook}
-      WEBHOOK_HOST: ${WEBHOOK_HOST:-http://nginx:80}
+      WEBHOOK_HOST: ${WEBHOOK_HOST:-https://tinvix.onrender.com}
       WEBHOOK_SECRET: ${WEBHOOK_SECRET:-my-webhook-secret-token}
     depends_on:
       - nginx

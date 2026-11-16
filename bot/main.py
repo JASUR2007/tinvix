@@ -44,21 +44,24 @@ async def setup_menu_button(bot: Bot):
 
 async def run_polling(bot: Bot, dp: Dispatcher):
     logger.info("Starting bot [%s] in POLLING mode...", INSTANCE_ID)
-    await bot.delete_webhook(drop_pending_updates=False)
-    await setup_menu_button(bot)
+    try:
+        await bot.delete_webhook(drop_pending_updates=False)
+        await setup_menu_button(bot)
+    except Exception as e:
+        logger.warning("Polling setup warning: %s", e)
 
-    # Health server satisfies Render Web Service port check
     port = int(os.getenv("PORT", settings.WEBHOOK_PORT))
     health_app = FastAPI()
 
     @health_app.get("/")
     @health_app.get("/health")
+    @health_app.get("/bot-webhook")
+    @health_app.get("/bot-webhook/health")
     async def health():
         return {"status": "ok", "mode": "polling", "instance_id": INSTANCE_ID}
 
     cfg = uvicorn.Config(health_app, host="0.0.0.0", port=port, log_level="warning")
     server = uvicorn.Server(cfg)
-    logger.info("Bot health port open on %s", port)
 
     await asyncio.gather(dp.start_polling(bot), server.serve())
 
@@ -70,10 +73,14 @@ def run_webhook(bot: Bot, dp: Dispatcher):
 
     @app.on_event("startup")
     async def on_startup():
-        await setup_menu_button(bot)
-        if settings.WEBHOOK_HOST:
-            url = f"{settings.WEBHOOK_HOST.rstrip('/')}{settings.WEBHOOK_PATH}"
-            await bot.set_webhook(url=url, secret_token=settings.WEBHOOK_SECRET, drop_pending_updates=False)
+        try:
+            await setup_menu_button(bot)
+            if settings.WEBHOOK_HOST and "onrender.com" in settings.WEBHOOK_HOST:
+                url = f"{settings.WEBHOOK_HOST.rstrip('/')}{settings.WEBHOOK_PATH}"
+                await bot.set_webhook(url=url, secret_token=settings.WEBHOOK_SECRET, drop_pending_updates=False)
+                logger.info("Webhook set: %s", url)
+        except Exception as e:
+            logger.warning("Webhook registration note: %s", e)
 
     @app.post(settings.WEBHOOK_PATH)
     async def telegram_update(request: Request):
@@ -86,6 +93,8 @@ def run_webhook(bot: Bot, dp: Dispatcher):
 
     @app.get("/")
     @app.get("/health")
+    @app.get("/bot-webhook")
+    @app.get("/bot-webhook/health")
     async def health():
         return {"status": "ok", "mode": "webhook", "instance_id": INSTANCE_ID}
 
