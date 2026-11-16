@@ -1,5 +1,6 @@
 import os
 import socket
+from typing import Optional
 from pydantic_settings import BaseSettings
 from pydantic import Field
 
@@ -11,7 +12,8 @@ class Settings(BaseSettings):
     # Security: Secret required to create products via API
     ADMIN_API_KEY: str = Field(default="tinvix_secret_admin_key_2026")
 
-    # Database
+    # Database: Render provides DATABASE_URL
+    DATABASE_URL: Optional[str] = None
     POSTGRES_USER: str = "postgres"
     POSTGRES_PASSWORD: str = "postgres"
     POSTGRES_HOST: str = "postgres"
@@ -24,7 +26,6 @@ class Settings(BaseSettings):
     MINIO_SECRET_KEY: str = "minioadmin"
     MINIO_BUCKET: str = "products"
     MINIO_SECURE: bool = False
-    # If set to relative path (default), images work seamlessly on localhost, mobile TMA, and tunnels!
     MINIO_PUBLIC_URL: str = "/storage/products"
     PUBLIC_BASE_URL: str = ""
 
@@ -33,6 +34,13 @@ class Settings(BaseSettings):
 
     @property
     def database_url(self) -> str:
+        if self.DATABASE_URL:
+            url = self.DATABASE_URL.strip()
+            if url.startswith("postgres://"):
+                url = url.replace("postgres://", "postgresql+asyncpg://", 1)
+            elif url.startswith("postgresql://") and not url.startswith("postgresql+asyncpg://"):
+                url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
+            return url
         return (
             f"postgresql+asyncpg://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}"
             f"@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
