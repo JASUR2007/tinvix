@@ -12,17 +12,30 @@ logger = logging.getLogger(__name__)
 
 class StorageService:
     def __init__(self):
+        endpoint = settings.MINIO_ENDPOINT.strip()
+        secure = settings.MINIO_SECURE
+
+        # Automatically handle full URLs (e.g. from Cloudflare R2)
+        if endpoint.startswith("https://"):
+            endpoint = endpoint.replace("https://", "")
+            secure = True
+        elif endpoint.startswith("http://"):
+            endpoint = endpoint.replace("http://", "")
+
+        endpoint = endpoint.rstrip("/")
+
         try:
             self.client = Minio(
-                endpoint=settings.MINIO_ENDPOINT,
+                endpoint=endpoint,
                 access_key=settings.MINIO_ACCESS_KEY,
                 secret_key=settings.MINIO_SECRET_KEY,
-                secure=settings.MINIO_SECURE,
+                secure=secure,
             )
         except Exception as e:
-            logger.warning("MinIO client init warning: %s", e)
+            logger.warning("S3/MinIO client init warning: %s", e)
             self.client = None
-        self.bucket = settings.MINIO_BUCKET
+
+        self.bucket = settings.MINIO_BUCKET.strip()
 
     def ensure_bucket(self) -> None:
         if not self.client:
@@ -32,7 +45,7 @@ class StorageService:
                 self.client.make_bucket(self.bucket)
                 logger.info("Bucket %s created.", self.bucket)
 
-            # Set public read policy for the bucket so clients can display photos
+            # Public read policy (works on MinIO, ignored gracefully on R2/AWS)
             policy = {
                 "Version": "2012-10-17",
                 "Statement": [
@@ -47,7 +60,7 @@ class StorageService:
             }
             self.client.set_bucket_policy(self.bucket, json.dumps(policy))
         except Exception as e:
-            logger.warning("Could not ensure MinIO bucket (%s), will fallback to local storage if needed.", e)
+            logger.info("Note on bucket check: %s (normal for Cloudflare R2)", e)
 
     def upload_file(
         self,
@@ -59,7 +72,7 @@ class StorageService:
         object_name = f"{uuid.uuid4().hex}.{ext}"
         image_url = ""
 
-        # Try MinIO first
+        # Try S3 / MinIO / R2
         try:
             if self.client:
                 self.ensure_bucket()
@@ -71,14 +84,16 @@ class StorageService:
                     content_type=content_type,
                 )
                 base_url = settings.MINIO_PUBLIC_URL.rstrip("/")
-                if base_url.endswith(f"/{self.bucket}"):
+                # If public URL is an R2 dev domain like https://pub-xxx.r2.dev
+                if "r2.dev" in base_url or base_url.endswith(f"/{self.bucket}"):
                     image_url = f"{base_url}/{object_name}"
                 else:
                     image_url = f"{base_url}/{self.bucket}/{object_name}"
+                logger.info("Uploaded to S3/R2 successfully: %s", image_url)
         except Exception as e:
-            logger.warning("MinIO put_object failed (%s), saving to local static storage...", e)
+            logger.warning("S3/R2 put_object failed (%s), saving to local static storage...", e)
 
-        # Fallback to local static storage if MinIO is not available (e.g. Render cloud deployment)
+        # Fallback to local static storage if S3/R2 is not configured
         if not image_url:
             base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
             upload_dir = os.path.join(base_dir, "static", "uploads")
@@ -87,7 +102,7 @@ class StorageService:
                 f.write(file_bytes)
             image_url = f"/storage/products/{object_name}"
 
-        # If PUBLIC_BASE_URL is set, prepend it
+        # If PUBLIC_BASE_URL is set, prepend it to relative URLs
         if settings.PUBLIC_BASE_URL and image_url.startswith("/"):
             image_url = f"{settings.PUBLIC_BASE_URL.rstrip('/')}{image_url}"
 
